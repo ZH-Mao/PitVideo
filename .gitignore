@@ -167,4 +167,4 @@ cython_debug/
 
 /pretrained_models
 
-/home/zhehua/codes/PitVideo-Segment-Landmark/lib/co_tracker/checkpoints/**
+/lib/co_tracker/checkpoints/**
