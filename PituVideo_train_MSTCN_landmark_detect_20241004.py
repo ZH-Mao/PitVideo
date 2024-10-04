@@ -242,6 +242,8 @@ def main():
         if epoch == end_epoch - 1:
             torch.save(model.module.state_dict(),
                         os.path.join(final_output_dir, 'final_state.pth'))
+            torch.save(model.module.hrnet.state_dict(), 'hrnet_weights.pth')
+            torch.save(model.module.mstcn_regression.state_dict(), 'mstcn_regression_weights.pth')
 
             writer_dict['writer'].close()
             end = timeit.default_timer()
