@@ -20,6 +20,7 @@ import torch._utils
 import torch.nn.functional as F
 # from lib.models import mstcn_svnet
 from lib.models import mstcn
+from einops import rearrange
 
 BatchNorm2d = nn.BatchNorm2d
 BN_MOMENTUM = 0.01
@@ -521,26 +522,28 @@ class MSTCN_Regression(nn.Module):
             
             
     def forward(self, x):
-        # x.shape = [3, 720, 184, 320] -> [3, 1, 184, 320]
+        # x.shape = [2x3, 720, 184, 320] -> [2x3, 1, 184, 320]
+        b = x.size(0)//3
         x = self.one_channel_layer(x)
         
         # suppose each video clip contains 3 images
-        # x.shape = [3, 58880]
-        x = self.flatten(x)
-        # x.shape = [1,3,58880]
-        x = x.unsqueeze(0)
-        # x.shape = [1, 58880, 3]
+        # x.shape = [2x3, 58880]
+        x = rearrange(x, '(b l) c h w -> b l (c h w)', b=b)
+        # x.shape = [2,3,58880]
+        # x = rearrange(x, '(b l) (c h w) -> b l (c h w)', b=b)
+        # x.shape = [2, 58880, 3]
         x = x.transpose(2, 1)
         
         # 2 stage tcn
-        # x.shape = [2, 1, 4080, 3]
+        # x.shape = [2, 2, 4080, 3]
         x = self.mstcn(x)
-        # x.shape = [3, 4080]
-        x = x[-1].transpose(2, 1).squeeze(0)
+        # x.shape = [2, 3, 4080]
+        x = x[-1].transpose(2, 1)
+        
+        x = rearrange(x, 'b l c -> (b l) c')
 
         # controid points
         cpts = self.landhead(x)
-        cpts = cpts.unsqueeze(0)
         return cpts
 
 class HRNet_MSTCN_Regression(nn.Module):
