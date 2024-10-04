@@ -168,3 +168,5 @@ cython_debug/
 /pretrained_models
 
 lib/co_tracker/checkpoints/cotracker2.pth
+
+.vscode/
