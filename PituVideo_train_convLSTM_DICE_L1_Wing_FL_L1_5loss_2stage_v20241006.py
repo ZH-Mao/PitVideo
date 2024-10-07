@@ -38,7 +38,7 @@ from lib.utils.utils import create_logger
 # from lib.core.function_video import train, validate, test
 # from lib.datasets.pitVideoDataset import PitDataset
 # from lib.models.segland_hrnet_mstcn import HighResolutionNet
-from lib.core.function_video_4loss_nMasks import train, validate
+from lib.core.function_video_train_val_seg_land import train, validate
 from lib.datasets.pitVideoDataset_3Masks import PitDataset
 from lib.models.segland_hrnet_convLSTM import HighResolutionNet
 import random
@@ -150,6 +150,7 @@ def main():
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True,
+        drop_last=True,
         sampler=None)
 
     # Seg_loss = nn.CrossEntropyLoss(
@@ -158,7 +159,7 @@ def main():
     L1_smooth = nn.SmoothL1Loss()
     Landmark_loss = mmwing_loss.WingLoss()
     Landmark_loss2 = focal_loss.FocalLoss()
-    L1_smooth2 = nn.SmoothL1Loss()
+    L1_smooth2 = nn.SmoothL1Loss(reduction='sum')
     # Landmark_loss3 = nn.SmoothL1Loss(reduction='none')
     loss_weight=torch.tensor(config.TRAIN.LOSS_WEIGHT).to(device)
     
@@ -240,24 +241,23 @@ def main():
             if train_mpck[-2]+train_mIoU > train_best_mpck15+train_best_mIoU:
                 train_best_mpck15 = train_mpck[-2]
                 train_best_mIoU = train_mIoU
-                train_old_models = glob.glob(os.path.join(final_output_dir, "train_best_model_*"))
+                train_old_models = glob.glob(os.path.join(final_output_dir, "train_best2_model_*"))
                 for train_old_model in train_old_models:
                     os.remove(train_old_model)
-                torch.save(model.module.state_dict(), os.path.join(final_output_dir, 'train_best_model_epo{:03d}.pth'.format(epoch)))
-                
+                torch.save(model.module.state_dict(), os.path.join(final_output_dir, 'train_best_model2_epo{:03d}.pth'.format(epoch)))
 
         # stage = 2
         valid_loss, mIoU, IoU_array, accuracy, recall, precision, valid_mDistance, mpck = validate(
                 config, testloader, model, 
-                Seg_loss, Landmark_loss, Landmark_loss2, writer_dict, device, stage, loss_weight)
+                Seg_loss, L1_smooth, Landmark_loss, Landmark_loss2, L1_smooth2, writer_dict, device, stage, loss_weight)
         
         if stage == 2 and (mpck[-2]+mIoU > best_mpck15+best_mIoU):
                 best_mpck15 = mpck[-2]
                 best_mIoU = mIoU
-                val_old_models = glob.glob(os.path.join(final_output_dir, "val_best_model_*"))
+                val_old_models = glob.glob(os.path.join(final_output_dir, "val_best_model2_*"))
                 for val_old_model in val_old_models:
                     os.remove(val_old_model)
-                torch.save(model.module.state_dict(),os.path.join(final_output_dir, 'val_best_model_epo{:03d}.pth'.format(epoch)))
+                torch.save(model.module.state_dict(),os.path.join(final_output_dir, 'val_best_model2_epo{:03d}.pth'.format(epoch)))
             
         logger.info('=> saving checkpoint to {}'.format(
             final_output_dir + 'checkpoint.pth.tar'))
@@ -291,7 +291,7 @@ def main():
 
         if epoch == end_epoch - 1:
             torch.save(model.module.state_dict(),
-                        os.path.join(final_output_dir, 'final_state.pth'))
+                        os.path.join(final_output_dir, 'final_state_epoch{:03d}.pth'.format(end_epoch)))
 
             writer_dict['writer'].close()
             end = timeit.default_timer()
