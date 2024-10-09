@@ -33,7 +33,7 @@ from tensorboardX import SummaryWriter
 from lib.config import config
 from lib.config import update_config
 # from core.criterion import CrossEntropy, OhemCrossEntropy
-from lib.core.bdl_losses import GeneralizedDice, SurfaceLoss, DiceLoss
+# from lib.core.bdl_losses import GeneralizedDice, SurfaceLoss, DiceLoss
 # from utils.modelsummary import get_model_summary
 # from utils.utils import create_logger, FullModel, get_rank
 from lib.utils.utils import create_logger
@@ -44,10 +44,10 @@ from lib.core.function_consistency_consecutiveIOUbased_test import test
 from lib.datasets.pitVideoDataset_3Masks import PitDataset
 from lib.models.segland_hrnet_convLSTM import HighResolutionNet
 import random
-from lib.core import mmwing_loss, focal_loss
+# from lib.core import mmwing_loss, focal_loss
 import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
-from itertools import chain
+# from torch.optim.lr_scheduler import StepLR
+# from itertools import chain
 
 
 seed = 2
@@ -69,14 +69,14 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold2.yaml',
                         help='experiment configure file name',
                         type=str)
     # parser.add_argument('--model',
     #                     default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1/val_best_model_epo130.pth',
     #                     help='trained model file',
     #                     type=str)
-    parser.add_argument("--gpu", type=str, default='1')
+    parser.add_argument("--gpu", type=str, default='0')
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
                         default=None,
@@ -117,7 +117,7 @@ def main():
 
     start = timeit.default_timer()
 
-    output_folder = 'PitVideo_convlstm_consecutiveIOU_results'
+    output_folder = 'PitVideo_convlstm_consecutiveIOU_results_trained_with_pixeldistance'
     test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device, temp_length=3)
 
     end = timeit.default_timer()

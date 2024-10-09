@@ -79,10 +79,23 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,trainloader,
         seg_out = F.interpolate(input=seg_out, size=(size[1], size[2]), mode='bilinear')
 
         seg_loss = Seg_loss(seg_out, labels)
+        # seg_loss_t = seg_loss.detach() 
+        seg_loss = seg_loss.mean()
+        # consistency loss option 1:
         seg_out_t = rearrange(seg_out, '(b l) c h w -> b l c h w', b=config.TRAIN.BATCH_SIZE_PER_GPU)
         seg_out_t = torch.cat([seg_out_t[:,1:], seg_out_t[:,-1:]], dim=1)
         seg_out_t = rearrange(seg_out_t, 'b l c h w -> (b l) c h w')
         seg_loss2 = L1_smooth(seg_out, seg_out_t)
+        
+        # # consistency loss option 2:
+        # index = rearrange(seg_loss_t, '(b l) p -> b l p', b=config.TRAIN.BATCH_SIZE_PER_GPU).mean(dim=2).argmin(dim=1)
+        # seg_out_temp = rearrange(seg_out, '(b l) c h w -> b l c h w', b=config.TRAIN.BATCH_SIZE_PER_GPU)
+        # seg_out_t = torch.zeros_like(seg_out_temp)
+        # for i in range(config.TRAIN.BATCH_SIZE_PER_GPU):
+        #     selected_frames_with_minloss = seg_out_temp[i, index[i]]
+        #     seg_out_t[i] = selected_frames_with_minloss.unsqueeze(0).repeat(3, 1, 1, 1)
+        # seg_out_t = rearrange(seg_out_t, 'b l c h w -> (b l) c h w')
+        # seg_loss2 = L1_smooth(seg_out, seg_out_t)
         
         cpts_out = torch.reshape(cpts_out, (cpts_gt.size(0), cpts_gt.size(1), cpts_gt.size(2)))
         if stage == 1:
@@ -97,17 +110,30 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,trainloader,
             cpts_loss2 = Landmark_loss2(cpts_out, cpts_gt)
             cpts_loss = cpts_loss * cpts_presence
             cpts_loss2 = cpts_loss2 * cpts_presence
+            # cpts_loss_t = (cpts_loss+cpts_loss2).detach()
             if torch.sum(cpts_presence) > 0:
                 cpts_loss = torch.sum(cpts_loss) / torch.sum(cpts_presence)
                 cpts_loss2 = torch.sum(cpts_loss2) / torch.sum(cpts_presence)
             else:
                 cpts_loss = torch.sum(cpts_loss)
                 cpts_loss2 = torch.sum(cpts_loss2)
+            # landmark consistency loss option 1:
             cpts_out_t = rearrange(cpts_out, '(b l) x y -> b l x y', b=config.TRAIN.BATCH_SIZE_PER_GPU)
             cpts_out_t = torch.cat([cpts_out_t[:,1:], cpts_out_t[:,-1:]], dim=1)
             cpts_out_t = rearrange(cpts_out_t, 'b l x y -> (b l) x y')
             cpts_loss3 = L1_smooth2(cpts_out*torch.from_numpy(np.array([1280, 720])).to(device), 
                                     cpts_out_t*torch.from_numpy(np.array([1280, 720])).to(device))/(cpts_presence.numel()- config.TRAIN.BATCH_SIZE_PER_GPU*8)
+            
+            # # landmark consistency loss option 2:
+            # index2 = rearrange(cpts_loss_t, '(b l) x y -> b l x y', b=config.TRAIN.BATCH_SIZE_PER_GPU).mean(dim=3).mean(dim=2).argmin(dim=1)
+            # cpts_out_tmp = rearrange(cpts_out, '(b l) x y -> b l x y', b=config.TRAIN.BATCH_SIZE_PER_GPU)
+            # cpts_out_t = torch.zeros_like(cpts_out_tmp)
+            # for i in range(config.TRAIN.BATCH_SIZE_PER_GPU):
+            #     selected_frames_with_minloss = cpts_out_tmp[i, index2[i]]
+            #     cpts_out_t[i] = selected_frames_with_minloss.unsqueeze(0).repeat(3, 1, 1)
+            # cpts_out_t = rearrange(cpts_out_t, 'b l x y -> (b l) x y')
+            # cpts_loss3 = L1_smooth2(cpts_out*torch.from_numpy(np.array([1280, 720])).to(device), 
+            #                         cpts_out_t*torch.from_numpy(np.array([1280, 720])).to(device))/(cpts_presence.numel()- config.TRAIN.BATCH_SIZE_PER_GPU*8)
             
         # calculate euclidean_distance between predicted and ground-truth landmarks
         labels = rearrange(labels, '(b l) h w -> b l h w', b=config.TRAIN.BATCH_SIZE_PER_GPU)[:,-1]
@@ -272,10 +298,23 @@ def validate(config, testloader, model, Seg_loss, L1_smooth, Landmark_loss, Land
             seg_out = F.interpolate(input=seg_out, size=(size[-2], size[-1]), mode='bilinear')
             
             seg_loss = Seg_loss(seg_out, labels)
+            # seg_loss_t = seg_loss.detach() 
+            seg_loss = seg_loss.mean()
+            # consistency loss option 1:
             seg_out_t = rearrange(seg_out, '(b l) c h w -> b l c h w', b=config.TEST.BATCH_SIZE_PER_GPU)
             seg_out_t = torch.cat([seg_out_t[:,1:], seg_out_t[:,-1:]], dim=1)
             seg_out_t = rearrange(seg_out_t, 'b l c h w -> (b l) c h w')
             seg_loss2 = L1_smooth(seg_out, seg_out_t)
+            
+            # # consistency loss option 2:
+            # index = rearrange(seg_loss_t, '(b l) p -> b l p', b=config.TEST.BATCH_SIZE_PER_GPU).mean(dim=2).argmin(dim=1)
+            # seg_out_temp = rearrange(seg_out, '(b l) c h w -> b l c h w', b=config.TEST.BATCH_SIZE_PER_GPU)
+            # seg_out_t = torch.zeros_like(seg_out_temp)
+            # for i in range(config.TEST.BATCH_SIZE_PER_GPU):
+            #     selected_frames_with_minloss = seg_out_temp[i, index[i]]
+            #     seg_out_t[i] = selected_frames_with_minloss.unsqueeze(0).repeat(3, 1, 1, 1)
+            # seg_out_t = rearrange(seg_out_t, 'b l c h w -> (b l) c h w')
+            # seg_loss2 = L1_smooth(seg_out, seg_out_t)
             
             cpts_out = torch.reshape(cpts_out, (cpts_out.size(0), cpts_gt.size(1), cpts_gt.size(2)))
             if stage == 1:
@@ -290,18 +329,31 @@ def validate(config, testloader, model, Seg_loss, L1_smooth, Landmark_loss, Land
                 cpts_loss2 = Landmark_loss2(cpts_out, cpts_gt)
                 cpts_loss = cpts_loss * cpts_presence
                 cpts_loss2 = cpts_loss2 * cpts_presence
+                # cpts_loss_t = (cpts_loss+cpts_loss2).detach()
                 if torch.sum(cpts_presence) > 0:
                     cpts_loss = torch.sum(cpts_loss) / torch.sum(cpts_presence)
                     cpts_loss2 = torch.sum(cpts_loss2) / torch.sum(cpts_presence)
                 else:
                     cpts_loss = torch.sum(cpts_loss)
                     cpts_loss2 = torch.sum(cpts_loss2)
+                # # landmark consistency loss option 1:
                 cpts_out_t = rearrange(cpts_out, '(b l) x y -> b l x y', b=config.TEST.BATCH_SIZE_PER_GPU)
                 cpts_out_t = torch.cat([cpts_out_t[:,1:], cpts_out_t[:,-1:]], dim=1)
                 cpts_out_t = rearrange(cpts_out_t, 'b l x y -> (b l) x y')
                 cpts_loss3 = L1_smooth2(cpts_out*torch.from_numpy(np.array([1280, 720])).to(device), 
                                         cpts_out_t*torch.from_numpy(np.array([1280, 720])).to(device))/(cpts_presence.numel()- config.TEST.BATCH_SIZE_PER_GPU*8)
             
+                # # landmark consistency loss option 2:
+                # index2 = rearrange(cpts_loss_t, '(b l) x y -> b l x y', b=config.TEST.BATCH_SIZE_PER_GPU).mean(dim=3).mean(dim=2).argmin(dim=1)
+                # cpts_out_tmp = rearrange(cpts_out, '(b l) x y -> b l x y', b=config.TEST.BATCH_SIZE_PER_GPU)
+                # cpts_out_t = torch.zeros_like(cpts_out_tmp)
+                # for i in range(config.TEST.BATCH_SIZE_PER_GPU):
+                #     selected_frames_with_minloss = cpts_out_tmp[i, index2[i]]
+                #     cpts_out_t[i] = selected_frames_with_minloss.unsqueeze(0).repeat(3, 1, 1)
+                # cpts_out_t = rearrange(cpts_out_t, 'b l x y -> (b l) x y')
+                # cpts_loss3 = L1_smooth2(cpts_out*torch.from_numpy(np.array([1280, 720])).to(device), 
+                #                         cpts_out_t*torch.from_numpy(np.array([1280, 720])).to(device))/(cpts_presence.numel()- config.TEST.BATCH_SIZE_PER_GPU*8)
+                
             # calculate euclidean_distance between predicted and ground-truth landmarks
             labels = rearrange(labels, '(b l) h w -> b l h w', b=config.TEST.BATCH_SIZE_PER_GPU)[:,-1]
             seg_out = rearrange(seg_out, '(b l) c h w -> b l c h w', b=config.TEST.BATCH_SIZE_PER_GPU)[:,-1]

@@ -155,7 +155,7 @@ def main():
 
     # Seg_loss = nn.CrossEntropyLoss(
     #     weight=torch.FloatTensor([0.05, 1.0, 2]).to(device))
-    Seg_loss = DiceLoss(idc=[0, 1, 2])
+    Seg_loss = DiceLoss(reduction='none', idc=[0, 1, 2])
     L1_smooth = nn.SmoothL1Loss()
     Landmark_loss = mmwing_loss.WingLoss()
     Landmark_loss2 = focal_loss.FocalLoss()
@@ -204,22 +204,23 @@ def main():
     train_best_mpck15 = 0
     best_mpck15 = 0
     last_epoch = 0
-    if config.TRAIN.RESUME:
-        model_state_file = os.path.join(final_output_dir,
-                                        'checkpoint.pth.tar')
-        if os.path.isfile(model_state_file):
-            checkpoint = torch.load(model_state_file,
-                                    map_location=lambda storage, loc: storage)
-            train_best_mIoU = checkpoint['train_best_mIoU']
-            train_best_mpck15 = checkpoint['train_best_mpck15']
-            last_epoch = checkpoint['epoch']
-            model.module.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
+    # if config.TRAIN.RESUME:
+    #     model_state_file = os.path.join(final_output_dir,
+    #                                     'checkpoint.pth.tar')
+    #     if os.path.isfile(model_state_file):
+    #         checkpoint = torch.load(model_state_file,
+    #                                 map_location=lambda storage, loc: storage)
+    #         train_best_mIoU = checkpoint['train_best_mIoU']
+    #         train_best_mpck15 = checkpoint['train_best_mpck15']
+    #         last_epoch = checkpoint['epoch']
+    #         model.module.load_state_dict(checkpoint['state_dict'])
+    #         optimizer.load_state_dict(checkpoint['optimizer'])
+    #         logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
 
     start = timeit.default_timer()
     end_epoch = config.TRAIN.END_EPOCH
     num_iters = config.TRAIN.END_EPOCH * epoch_iters
+    last_epoch = 150
 
     for epoch in range(last_epoch, end_epoch):
         if epoch < config.TRAIN.STAGE1_EPOCH:
@@ -241,10 +242,10 @@ def main():
             if train_mpck[-2]+train_mIoU > train_best_mpck15+train_best_mIoU:
                 train_best_mpck15 = train_mpck[-2]
                 train_best_mIoU = train_mIoU
-                train_old_models = glob.glob(os.path.join(final_output_dir, "train_best2_model_*"))
+                train_old_models = glob.glob(os.path.join(final_output_dir, "train_best_model3_*"))
                 for train_old_model in train_old_models:
                     os.remove(train_old_model)
-                torch.save(model.module.state_dict(), os.path.join(final_output_dir, 'train_best_model2_epo{:03d}.pth'.format(epoch)))
+                torch.save(model.module.state_dict(), os.path.join(final_output_dir, 'train_best_model3_epo{:03d}.pth'.format(epoch)))
 
         # stage = 2
         valid_loss, mIoU, IoU_array, accuracy, recall, precision, valid_mDistance, mpck = validate(
@@ -254,10 +255,10 @@ def main():
         if stage == 2 and (mpck[-2]+mIoU > best_mpck15+best_mIoU):
                 best_mpck15 = mpck[-2]
                 best_mIoU = mIoU
-                val_old_models = glob.glob(os.path.join(final_output_dir, "val_best_model2_*"))
+                val_old_models = glob.glob(os.path.join(final_output_dir, "val_best_model3_*"))
                 for val_old_model in val_old_models:
                     os.remove(val_old_model)
-                torch.save(model.module.state_dict(),os.path.join(final_output_dir, 'val_best_model2_epo{:03d}.pth'.format(epoch)))
+                torch.save(model.module.state_dict(),os.path.join(final_output_dir, 'val_best_model3_epo{:03d}.pth'.format(epoch)))
             
         logger.info('=> saving checkpoint to {}'.format(
             final_output_dir + 'checkpoint.pth.tar'))
@@ -291,7 +292,7 @@ def main():
 
         if epoch == end_epoch - 1:
             torch.save(model.module.state_dict(),
-                        os.path.join(final_output_dir, 'final_state_epoch{:03d}.pth'.format(end_epoch)))
+                        os.path.join(final_output_dir, 'final_state3_epoch{:03d}.pth'.format(end_epoch)))
 
             writer_dict['writer'].close()
             end = timeit.default_timer()

@@ -59,10 +59,11 @@ class GeneralizedDice():
 
 
 class DiceLoss():
-    def __init__(self, **kwargs):
+    def __init__(self, reduction: str = 'mean', **kwargs):
         # Self.idc is used to filter out some classes of the target mask. Use fancy indexing
         self.idc: List[int] = kwargs["idc"]
         # print(f"Initialized {self.__class__.__name__} with {kwargs}")
+        self.reduction = reduction
 
     def __call__(self, probs: Tensor, target: Tensor) -> Tensor:
         probs = torch.softmax(probs, dim=1)
@@ -76,8 +77,12 @@ class DiceLoss():
         union: Tensor = (einsum("bkwh->bk", pc) + einsum("bkwh->bk", tc))
 
         divided: Tensor = torch.ones_like(intersection) - (2 * intersection + 1e-10) / (union + 1e-10)
-
-        loss = divided.mean()
+        if self.reduction == 'mean':
+            loss = divided.mean()
+        elif self.reduction == 'sum':
+            loss = divided.sun()
+        else:
+            loss = divided
 
         return loss
 

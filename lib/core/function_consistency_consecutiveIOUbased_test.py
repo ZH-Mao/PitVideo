@@ -77,33 +77,16 @@ def test(config, testloader, model, sv_dir='', sv_pred=True, device=None, temp_l
             cpts_out = cpts_out[1:]
             cpts_presence = (cpts_gt!=-100).to(torch.int32)
             name = name[-temp_length:][1:]
-            
-            # # calculate euclidean_distance between predicted and ground-truth landmarks
-            # cpts_out= cpts_out*cpts_presence
-            # norm_squared_distance = torch.square(cpts_out-cpts_gt) * cpts_presence
-            # squared_distance = torch.zeros_like(norm_squared_distance)
-            # squared_distance[:, :, 0] = norm_squared_distance[:, :, 0]*(size[-1]**2) 
-            # squared_distance[:, :, 1] = norm_squared_distance[:, :, 1]*(size[-2]**2)
-            # euclidean_distance = torch.sum(
-            #     squared_distance, dim=(2), keepdim=True)
-            # euclidean_distance = torch.sqrt(euclidean_distance.squeeze(dim=2))
-            # # calculate how many points are within 144 pixels from their corresponding ground truth
-            # num_inThresh = ((euclidean_distance >= 0) & (
-            #     euclidean_distance <= 36)).float()
-            # num_inThresh = num_inThresh*cpts_presence[:, :, 0]
-            # total_num_inThresh += torch.sum(num_inThresh)
-            
-            # 计算预测和真值标注点之间的欧氏距离
+                       
+            # calculate euclidean_distance between predicted and ground-truth landmarks
             squared_distance = torch.square(cpts_out - cpts_gt).detach() * cpts_presence
             squared_distance[:, :, 0] *= 1280**2
             squared_distance[:, :, 1] *= 720**2
             euclidean_distance = torch.sqrt(torch.sum(squared_distance, dim=2))
-            # 定义多个阈值
             thresholds = [36, 72, 108, 144]
-            # 计算每个阈值范围内的点的数量，并将其累加到 total_num_inThresh (NumPy数组)
             for i, thresh in enumerate(thresholds):
                 num_inThresh = ((euclidean_distance <= thresh) * cpts_presence[:, :, 0]).float()
-                total_num_inThresh[i] += torch.sum(num_inThresh).item()  # 转换为标量并累加到 NumPy 数组
+                total_num_inThresh[i] += torch.sum(num_inThresh).item()  
             
             total_num_Present += torch.sum(cpts_presence[:, :, 0])
             total_distance += torch.sum(euclidean_distance)
