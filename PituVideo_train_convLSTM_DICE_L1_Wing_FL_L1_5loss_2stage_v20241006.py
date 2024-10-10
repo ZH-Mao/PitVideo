@@ -232,9 +232,9 @@ def main():
             stage = 2
             if epoch == config.TRAIN.STAGE1_EPOCH:
                 logger.info('=> saving final model of stage 1 to {}'.format(
-                            os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch))))
+                            os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch-1))))
                 torch.save(model.module.state_dict(), 
-                        os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch))) 
+                        os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch-1))) 
                 train_best_mIoU =0
                 best_mIoU = 0
             for param in head2_params:
