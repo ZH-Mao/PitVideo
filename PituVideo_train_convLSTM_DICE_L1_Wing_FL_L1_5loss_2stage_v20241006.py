@@ -204,18 +204,18 @@ def main():
     train_best_mpck15 = 0
     best_mpck15 = 0
     last_epoch = 0
-    # if config.TRAIN.RESUME:
-    #     model_state_file = os.path.join(final_output_dir,
-    #                                     'checkpoint.pth.tar')
-    #     if os.path.isfile(model_state_file):
-    #         checkpoint = torch.load(model_state_file,
-    #                                 map_location=lambda storage, loc: storage)
-    #         train_best_mIoU = checkpoint['train_best_mIoU']
-    #         train_best_mpck15 = checkpoint['train_best_mpck15']
-    #         last_epoch = checkpoint['epoch']
-    #         model.module.load_state_dict(checkpoint['state_dict'])
-    #         optimizer.load_state_dict(checkpoint['optimizer'])
-    #         logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
+    if config.TRAIN.RESUME:
+        model_state_file = os.path.join(final_output_dir,
+                                        'checkpoint.pth.tar')
+        if os.path.isfile(model_state_file):
+            checkpoint = torch.load(model_state_file,
+                                    map_location=lambda storage, loc: storage)
+            train_best_mIoU = checkpoint['train_best_mIoU']
+            train_best_mpck15 = checkpoint['train_best_mpck15']
+            last_epoch = checkpoint['epoch']
+            model.module.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
 
     start = timeit.default_timer()
     end_epoch = config.TRAIN.END_EPOCH
