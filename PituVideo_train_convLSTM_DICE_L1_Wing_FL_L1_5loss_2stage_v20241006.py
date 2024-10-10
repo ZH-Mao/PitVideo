@@ -231,10 +231,14 @@ def main():
         else:
             stage = 2
             if epoch == config.TRAIN.STAGE1_EPOCH:
+                logger.info('=> saving final model of stage 1 to {}'.format(
+                            os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch))))
+                torch.save(model.module.state_dict(), 
+                        os.path.join(final_output_dir, 'final_state_stage1_epoch{:03d}.pth'.format(epoch))) 
                 train_best_mIoU =0
                 best_mIoU = 0
-                for param in head2_params:
-                    param.requires_grad = True           
+            for param in head2_params:
+                param.requires_grad = True           
             train_total_loss, train_mIoU, train_IoU, train_accuracy, train_recall, train_precision, train_mdistance, train_mpck,\
                     = train(config, epoch, config.TRAIN.END_EPOCH, epoch_iters, config.TRAIN.LR, num_iters,trainloader, optimizer, model, 
                             Seg_loss, L1_smooth, Landmark_loss, Landmark_loss2,L1_smooth2, writer_dict, device, stage, loss_weight)
