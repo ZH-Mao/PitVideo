@@ -8,7 +8,7 @@ import random
 from lib.models.seg_hrnet_v4_1 import HighResolutionNet
 from lib.datasets.pitVideoDataset_3Masks import PitDataset
 from lib.utils.utils import create_logger
-from lib.core.function_consistency_consecutiveIOUbased_test import test
+from lib.core.function_consistency_consecutiveIOUbased_test_perframe import test
 from lib.config import update_config
 from lib.config import config
 # import segmentation_models_pytorch as smp
@@ -41,13 +41,13 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/Pituitary-Segment-Centroid/experiments/pituitary/image_hrnet_w48_train_736x1280_sgd_lr1e-2_2stage_use_all_pseudolabel_fold1.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1.yaml',
                         help='experiment configure file name',
                         type=str)
-    # parser.add_argument('--model',
-    #                     default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1/val_best_model_epo130.pth',
-    #                     help='trained model file',
-    #                     type=str)
+    parser.add_argument('--model',
+                        default= r'/home/zhehua/data/Results/PitSurgRT_trained/image_hrnet_w48_train_736x1280_sgd_lr1e-2_2stage_fold1/final_state.pth',
+                        help='trained model file',
+                        type=str)
     parser.add_argument("--gpu", type=str, default='1')
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
@@ -73,7 +73,8 @@ def main():
 
     # build model
     model = HighResolutionNet(config)
-    model.init_weights(config.MODEL.PRETRAINED)
+    # model.init_weights(config.MODEL.PRETRAINED)
+    model.init_weights(args.model)
     model = model.to(device)
     model = torch.nn.DataParallel(model)
 
@@ -101,8 +102,8 @@ def main():
 
     start = timeit.default_timer()
     
-    output_folder = 'PitImage_consecutiveIOU_use_all_pseudolabel_results'
-    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device)
+    # output_folder = 'PitImage_consecutiveIOU_use_all_pseudolabel_results'
+    test(config, testloader, model, sv_dir=final_output_dir, sv_pred=True, device=device)
 
     end = timeit.default_timer()
     logger.info('Mins: %d' % np.int32((end-start)/60))

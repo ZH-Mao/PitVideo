@@ -40,7 +40,7 @@ from lib.utils.utils import create_logger
 # from lib.core.function_video import train, validate, test
 # from lib.datasets.pitVideoDataset import PitDataset
 # from lib.models.segland_hrnet_mstcn import HighResolutionNet
-from lib.core.function_consistency_consecutiveIOUbased_test import test
+from lib.core.function_consistency_consecutiveIOUbased_test_perframe import test
 from lib.datasets.pitVideoDataset_3Masks import PitDataset
 from lib.models.segland_hrnet_convLSTM import HighResolutionNet
 import random
@@ -69,11 +69,11 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1.yaml',
                         help='experiment configure file name',
                         type=str)
     parser.add_argument('--model',
-                        default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss/video_hrnet_convlstm_w48_train_736x1280_sgd_lr1e-2_bs_3_epoch500_4loss_2stage_fold1_2024-04-30-00-04/train_best_mpck20.pth',
+                        default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1/val_best_model3_epo196.pth',
                         help='trained model file',
                         type=str)
     parser.add_argument("--gpu", type=str, default='1')
@@ -111,15 +111,15 @@ def main():
 
     testloader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=1,
+        batch_size=1, #batch size has to be 1, otherwise the model will not work
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True)
 
     start = timeit.default_timer()
 
-    output_folder = 'PitVideo_convlstm_consecutiveIOU_results_without_consistency_loss'
-    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device, temp_length=3)
+    # output_file_excel = 'tempconsisnet.xlsx'
+    test(config, testloader, model, sv_dir=final_output_dir, sv_pred=False, device=device, temp_length=3)
 
     end = timeit.default_timer()
     logger.info('Mins: %d' % np.int32((end-start)/60))

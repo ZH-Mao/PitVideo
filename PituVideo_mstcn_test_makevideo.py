@@ -1,25 +1,49 @@
 # ------------------------------------------------------------------------------
-# Copyright (c) Microsoft
-# Licensed under the MIT License.
-# ------------------------------------------------------------------------------
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = '0'  # GPU id
-import random
-from lib.models.seg_hrnet_v4_1 import HighResolutionNet
-from lib.datasets.pitVideoDataset_3Masks import PitDataset
-from lib.utils.utils import create_logger
-from lib.core.function_consistency_consecutiveIOUbased_test import test
-from lib.config import update_config
-from lib.config import config
-# import segmentation_models_pytorch as smp
-# from tensorboardX import SummaryWriter
-import torch.optim
-import torch
-import matplotlib.pyplot as plt
-import numpy as np
-import timeit
-import pprint
+# os.environ["CUDA_VISIBLE_DEVICES"]='1'  #GPU id
+# os.environ["CUDA_LAUNCH_BLOCKING"]='1'
+# os.environ['MASTER_ADDR'] = 'localhost'
+# os.environ['MASTER_PORT'] = '5678'
+
 import argparse
+import os
+import pprint
+# import shutil
+# import sys
+
+import logging
+import time
+import timeit
+from pathlib import Path
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import torch
+import torch.nn as nn
+# import torch.backends.cudnn as cudnn
+import torch.optim
+# from torch.utils.data.distributed import DistributedSampler
+from tensorboardX import SummaryWriter
+# import segmentation_models_pytorch as smp
+
+from lib.config import config
+from lib.config import update_config
+# from core.criterion import CrossEntropy, OhemCrossEntropy
+# from utils.modelsummary import get_model_summary
+# from utils.utils import create_logger, FullModel, get_rank
+from lib.utils.utils import create_logger
+# from lib.core.function_video import train, validate, test
+# from lib.datasets.pitVideoDataset import PitDataset
+# from lib.models.segland_hrnet_mstcn import HighResolutionNet
+from lib.core.function_overlays_make_video import test
+from lib.datasets.pitVideoDataset_3Masks_mstcn import PitDataset
+from lib.models.segland_hrnet_mstcn import HighResolutionNet
+import random
+from lib.core import mmwing_loss, focal_loss
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
+from itertools import chain
 
 
 seed = 2
@@ -41,7 +65,7 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/Pituitary-Segment-Centroid/experiments/pituitary/image_hrnet_w48_train_736x1280_sgd_lr1e-2_2stage_use_all_pseudolabel_fold1.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_mstcn_w48_2stage_5loss_makevideo_fold1.yaml',
                         help='experiment configure file name',
                         type=str)
     # parser.add_argument('--model',
@@ -77,18 +101,6 @@ def main():
     model = model.to(device)
     model = torch.nn.DataParallel(model)
 
-    # dump_input = torch.rand(
-    #     (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
-    # )
-    # logger.info(get_model_summary(model.to(device), dump_input.to(device)))
-
-    # if config.TEST.MODEL_FILE:
-    #     model_state_file = config.TEST.MODEL_FILE
-    # else:
-    #     model_state_file = os.path.join(final_output_dir,
-    #                                     'best_mIoU.pth')
-    # logger.info('=> loading model from {}'.format(model_state_file))
-
     # prepare data
     test_dataset = PitDataset(config, is_train=False, to_tensor=True)
 
@@ -100,9 +112,9 @@ def main():
         pin_memory=True)
 
     start = timeit.default_timer()
-    
-    output_folder = 'PitImage_consecutiveIOU_use_all_pseudolabel_results'
-    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device)
+
+    output_folder = 'PitVideo_mstcn_makevideo'
+    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device, temp_length=3)
 
     end = timeit.default_timer()
     logger.info('Mins: %d' % np.int32((end-start)/60))

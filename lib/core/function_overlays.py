@@ -23,7 +23,7 @@ from ..utils.utils import get_world_size, get_rank
 # import segmentation_models_pytorch as smp
 from PIL import Image, ImageDraw
 import cv2
-from ..co_tracker.fun_pseudolabel_generator import predict_propagation
+from einops import rearrange
 
 def reduce_tensor(inp):
     """
@@ -40,67 +40,54 @@ def reduce_tensor(inp):
 
 def test(config, testloader, model, sv_dir='', sv_pred=True, device=None, temp_length=3):
     model.eval()
-    total_num_points = 0
-    total_num_inThresh = np.zeros(4)
-    total_distance = 0
-    total_num_Present= 0 
-    confusion_matrix = np.zeros((config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
+    # total_num_points = 0
+    # total_num_inThresh = np.zeros(4)
+    # total_distance = 0
+    # total_num_Present= 0 
+    # confusion_matrix = np.zeros((config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
         
     with torch.no_grad():
         for _, batch in enumerate(tqdm(testloader)):
-            images, labels, _, _, name = batch
+            images, labels, cpts_gt, cpts_presence, name = batch
             name = [item for sublist in name for item in sublist]
-
-            cpts_presence = torch.from_numpy(np.ones([2, 4, 2]))
+            images = rearrange(images, 'b l c h w -> (b l) c h w')
+            labels = rearrange(labels, 'b l h w -> (b l) h w')
+            cpts_gt = rearrange(cpts_gt, 'b l x y -> (b l) x y')
+            cpts_presence = rearrange(cpts_presence, 'b l x y -> (b l) x y')
             size = labels.size()
             images = images.to(device)
+            labels = labels.long().to(device)
+            cpts_gt = cpts_gt.to(device)
             cpts_presence = cpts_presence.to(device)
-            total_num_points +=cpts_presence.size(0)*cpts_presence.size(1)
 
             seg_out, cpts_out = model(images)
             seg_out = F.interpolate(input=seg_out, size=(size[-2], size[-1]), mode='bilinear')
-            cpts_out = torch.reshape(cpts_out, (cpts_out.size(0), -1, 2))
             
-            # here we replace the ground truth with the tracked predicted one for consistency calculation
-            labels = []
-            cpts_gt = []
-            for i in range(temp_length-1):
-                pred_mask, pred_cpts = predict_propagation(config, name, seg_out[i], cpts_out[i], cpts_presence[i], i)
-                labels.append(torch.from_numpy(pred_mask))
-                cpts_gt.append(torch.from_numpy(pred_cpts))
-            labels = torch.stack(labels, dim=0).to(device)
-            cpts_gt = torch.stack(cpts_gt, dim=0).to(device)
-            images = images.squeeze(0)[1:]
-            images = F.interpolate(input=images, size=(
-                size[-2], size[-1]), mode='bilinear')
-            seg_out = seg_out[1:]
-            cpts_out = cpts_out[1:]
-            cpts_presence = (cpts_gt!=-100).to(torch.int32)
-            name = name[-temp_length:][1:]
-
+            cpts_out = torch.reshape(cpts_out, (cpts_out.size(0), cpts_gt.size(1), cpts_gt.size(2)))
+              
             # # calculate euclidean_distance between predicted and ground-truth landmarks
-            squared_distance = torch.square(cpts_out - cpts_gt).detach() * cpts_presence
-            squared_distance[:, :, 0] *= 1280**2
-            squared_distance[:, :, 1] *= 720**2
-            euclidean_distance = torch.sqrt(torch.sum(squared_distance, dim=2))
-            thresholds = [36, 72, 108, 144]
-            for i, thresh in enumerate(thresholds):
-                num_inThresh = ((euclidean_distance <= thresh) * cpts_presence[:, :, 0]).float()
-                total_num_inThresh[i] += torch.sum(num_inThresh).item()  
+            # squared_distance = torch.square(cpts_out - cpts_gt).detach() * cpts_presence
+            # squared_distance[:, :, 0] *= 1280**2
+            # squared_distance[:, :, 1] *= 720**2
+            # euclidean_distance = torch.sqrt(torch.sum(squared_distance, dim=2))
+            # thresholds = [36, 72, 108, 144]
+            # for i, thresh in enumerate(thresholds):
+            #     num_inThresh = ((euclidean_distance <= thresh) * cpts_presence[:, :, 0]).float()
+            #     total_num_inThresh[i] += torch.sum(num_inThresh).item() 
             
-            total_num_Present += torch.sum(cpts_presence[:, :, 0])
-            total_distance += torch.sum(euclidean_distance)
+            # total_num_points +=cpts_presence.size(0)*cpts_presence.size(1)
+            # total_num_Present += torch.sum(cpts_presence[:, :, 0])
+            # total_distance += torch.sum(euclidean_distance)
             
-            confusion_matrix += get_confusion_matrix(
-                labels,
-                seg_out,
-                size,
-                config.DATASET.NUM_CLASSES,
-                config.TRAIN.IGNORE_LABEL)
+            # confusion_matrix += get_confusion_matrix(
+            #     labels,
+            #     seg_out,
+            #     size,
+            #     config.DATASET.NUM_CLASSES,
+            #     config.TRAIN.IGNORE_LABEL)
             
             if sv_pred:
                 sv_path = sv_dir
-                # sv_path = os.path.join(sv_dir, 'PitVideo_Pred_results')
                 if not os.path.exists(sv_path):
                     os.mkdir(sv_path)
                 mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -182,22 +169,22 @@ def test(config, testloader, model, sv_dir='', sv_pred=True, device=None, temp_l
                         j += 1
                     result_image.save(os.path.join(sv_path, name[i]))
                     
-        confusion_matrix = torch.from_numpy(confusion_matrix).to(device)
-        reduced_confusion_matrix = reduce_tensor(confusion_matrix)
+        # confusion_matrix = torch.from_numpy(confusion_matrix).to(device)
+        # reduced_confusion_matrix = reduce_tensor(confusion_matrix)
 
-        confusion_matrix = reduced_confusion_matrix.cpu().numpy()
-        pos = confusion_matrix.sum(1)
-        res = confusion_matrix.sum(0)
-        tp = np.diag(confusion_matrix)
-        accuracy = tp.sum()/pos.sum()*100
-        recall = (tp/np.maximum(1.0, pos))*100
-        precision = (tp/np.maximum(1.0, res))*100
-        IoU_array = (tp / np.maximum(1.0, pos + res - tp))*100
-        mean_IoU = IoU_array[-2:].mean()
+        # confusion_matrix = reduced_confusion_matrix.cpu().numpy()
+        # pos = confusion_matrix.sum(1)
+        # res = confusion_matrix.sum(0)
+        # tp = np.diag(confusion_matrix)
+        # accuracy = tp.sum()/pos.sum()*100
+        # recall = (tp/np.maximum(1.0, pos))*100
+        # precision = (tp/np.maximum(1.0, res))*100
+        # IoU_array = (tp / np.maximum(1.0, pos + res - tp))*100
+        # mean_IoU = IoU_array[-2:].mean()
         
-        mean_distance = total_distance/total_num_Present
-        mpck = total_num_inThresh/total_num_Present.cpu().numpy()*100
-        logging.info('Test_Metric==> IoU_array:{}, mean_IoU:{}, Recall:{}, Accuracy:{}, Precision:{}, MPCK:{}, mean_Distance:{: 4.4f}'.format(
-                IoU_array, mean_IoU, recall, accuracy, precision, mpck, mean_distance))
+        # mean_distance = total_distance/total_num_Present
+        # mpck = total_num_inThresh/total_num_Present.cpu().numpy()*100
+        # logging.info('Test_Metric==> IoU_array:{}, mean_IoU:{}, Recall:{}, Accuracy:{}, Precision:{}, MPCK:{}, mean_Distance:{: 4.4f}'.format(
+        #         IoU_array, mean_IoU, recall, accuracy, precision, mpck, mean_distance))
 
 

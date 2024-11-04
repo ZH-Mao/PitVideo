@@ -27,27 +27,23 @@ import torch.optim
 from tensorboardX import SummaryWriter
 # import segmentation_models_pytorch as smp
 
-# import tools._init_paths
-# import models
-# import datasets
 from lib.config import config
 from lib.config import update_config
 # from core.criterion import CrossEntropy, OhemCrossEntropy
-# from lib.core.bdl_losses import GeneralizedDice, SurfaceLoss, DiceLoss
 # from utils.modelsummary import get_model_summary
 # from utils.utils import create_logger, FullModel, get_rank
 from lib.utils.utils import create_logger
 # from lib.core.function_video import train, validate, test
 # from lib.datasets.pitVideoDataset import PitDataset
 # from lib.models.segland_hrnet_mstcn import HighResolutionNet
-from lib.core.function_consistency_consecutiveIOUbased_test import test
-from lib.datasets.pitVideoDataset_3Masks import PitDataset
-from lib.models.segland_hrnet_convLSTM import HighResolutionNet
+from lib.core.function_consistency_consecutiveIOUbased_test_perframe import test
+from lib.datasets.pitVideoDataset_3Masks_mstcn import PitDataset
+from lib.models.segland_hrnet_mstcn import HighResolutionNet
 import random
-# from lib.core import mmwing_loss, focal_loss
+from lib.core import mmwing_loss, focal_loss
 import torch.optim as optim
-# from torch.optim.lr_scheduler import StepLR
-# from itertools import chain
+from torch.optim.lr_scheduler import StepLR
+from itertools import chain
 
 
 seed = 2
@@ -69,11 +65,11 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_mstcn_w48_2stage_5loss_fold1.yaml',
                         help='experiment configure file name',
                         type=str)
     parser.add_argument('--model',
-                        default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss/video_hrnet_convlstm_w48_train_736x1280_sgd_lr1e-2_bs_3_epoch500_4loss_2stage_fold1_2024-04-30-00-04/train_best_mpck20.pth',
+                        default= r'/home/zhehua/data/Results/pituitary/video_hrnet_mstcn_w48_2stage_5loss_fold1/val_best_model_epo068.pth',
                         help='trained model file',
                         type=str)
     parser.add_argument("--gpu", type=str, default='1')
@@ -118,8 +114,8 @@ def main():
 
     start = timeit.default_timer()
 
-    output_folder = 'PitVideo_convlstm_consecutiveIOU_results_without_consistency_loss'
-    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device, temp_length=3)
+    output_file = 'mstcn_fold1.xlsx'
+    test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_file), sv_pred=True, device=device, temp_length=3)
 
     end = timeit.default_timer()
     logger.info('Mins: %d' % np.int32((end-start)/60))
