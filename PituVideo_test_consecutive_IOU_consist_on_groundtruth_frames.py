@@ -111,7 +111,7 @@ def main():
 
     testloader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=1, #batch size has to be 1, otherwise the model will not work
+        batch_size=2, #batch size has to be 1, otherwise the model will not work
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True)
