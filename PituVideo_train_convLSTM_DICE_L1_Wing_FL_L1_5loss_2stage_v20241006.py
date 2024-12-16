@@ -220,7 +220,6 @@ def main():
     start = timeit.default_timer()
     end_epoch = config.TRAIN.END_EPOCH
     num_iters = config.TRAIN.END_EPOCH * epoch_iters
-    last_epoch = 150
 
     for epoch in range(last_epoch, end_epoch):
         if epoch < config.TRAIN.STAGE1_EPOCH:
