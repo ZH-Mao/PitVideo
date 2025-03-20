@@ -46,7 +46,7 @@ def parse_args():
                         help='experiment configure file name',
                         type=str)
     parser.add_argument('--model',
-                        default= r'/home/zhehua/codes/pit-anat-temp/outputs/models/mul/fold1_2.pth',
+                        default= r'/home/zhehua/codes/PAINet/outputs/models/mul/fold1_2.pth',
                         help='trained model file',
                         type=str)
     parser.add_argument("--gpu", type=str, default='0')

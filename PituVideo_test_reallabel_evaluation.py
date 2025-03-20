@@ -61,19 +61,18 @@ torch.backends.cudnn.deterministic = True
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train segmentation network')
+    parser = argparse.ArgumentParser(description='TEST segmentation network')
 
     # parser.add_argument('--cfg',
     #                     help='experiment configure file name',
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_fold1.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1_010_0005.yaml',
                         help='experiment configure file name',
                         type=str)
     parser.add_argument('--model',
-                        # default=r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_train_736x1280_sgd_lr1e-2_bs_3_epoch500_4loss_2stage_fold1/video_hrnet_convlstm_w48_train_736x1280_sgd_lr1e-2_bs_3_epoch500_4loss_2stage_fold1_2024-04-30-00-04/final_state.pth',
-                        default= '/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_fold1/video_hrnet_convlstm_w48_2stage_fold1_2024-07-19-10-34/final_state.pth',
+                        default=r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1_010_0005/val_best_model_epo174.pth',
                         help='trained model file',
                         type=str)
     parser.add_argument("--local_rank", type=int, default=0)
@@ -91,7 +90,7 @@ def main():
     args = parse_args()
 
     logger, final_output_dir = create_logger(
-        config, args.cfg, 'test')
+        config, args.cfg, 'test_vs_gt')
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))

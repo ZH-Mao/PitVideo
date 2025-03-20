@@ -69,11 +69,11 @@ def parse_args():
     #                     required=True,
     #                     type=str)
     parser.add_argument('--cfg',
-                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss.yaml',
+                        default=r'/home/zhehua/codes/PitVideo-Segment-Landmark/experiments/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1_010_0005.yaml',
                         help='experiment configure file name',
                         type=str)
     parser.add_argument('--model',
-                        default= r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_4loss_fold1_without_consisLoss/video_hrnet_convlstm_w48_train_736x1280_sgd_lr1e-2_bs_3_epoch500_4loss_2stage_fold1_2024-04-30-00-04/train_best_mpck20.pth',
+                        default=r'/home/zhehua/data/Results/pituitary/video_hrnet_convlstm_w48_2stage_5loss_fold1_010_0005/val_best_model_epo174.pth',
                         help='trained model file',
                         type=str)
     parser.add_argument("--gpu", type=str, default='1')
@@ -101,8 +101,8 @@ def main():
 
     # build model
     model = HighResolutionNet(config)
-    # model.init_weights(config.MODEL.PRETRAINED)
-    model.init_weights(args.model)
+    model.init_weights(config.MODEL.PRETRAINED)
+    # model.init_weights(args.model)
     model = model.to(device)
     model = torch.nn.DataParallel(model)
 
@@ -118,7 +118,7 @@ def main():
 
     start = timeit.default_timer()
 
-    output_folder = 'PitVideo_convlstm_consecutiveIOU_results_without_consistency_loss'
+    output_folder = 'PitVideo_convlstm_tracked_pred_vs_pred_hoover'
     test(config, testloader, model, sv_dir=os.path.join(final_output_dir, output_folder), sv_pred=True, device=device, temp_length=3)
 
     end = timeit.default_timer()
