@@ -60,6 +60,11 @@ class PitDataset(Dataset):
                                                'image2': 'image',
                                             #    'image1': 'image',
                                                'image': 'image',
+                                               'mask4': 'mask',
+                                            #    'mask3': 'mask',
+                                               'mask2': 'mask',
+                                            #    'mask1': 'mask',
+                                               'mask': 'mask',
                                                'keypoints4': 'keypoints',
                                             #    'keypoints3': 'keypoints',
                                                'keypoints2': 'keypoints',
@@ -156,8 +161,13 @@ class PitDataset(Dataset):
         if self.is_train:
             sample = self.transform_train(
                 image4=image4, image2=image2,image=image, 
+                mask4=mask4,mask2=mask2, mask=mask, 
                 keypoints4=cpts4, keypoints2=cpts2,  keypoints=cpts)
             image4, image2, image = sample['image4'], sample['image2'], sample['image']
+            mask4, mask2, mask = sample['mask4'], sample['mask2'], sample['mask']
+            mask4 = cv2.resize(mask4, (1280, 720), interpolation=cv2.INTER_NEAREST)
+            mask2 = cv2.resize(mask2, (1280, 720), interpolation=cv2.INTER_NEAREST)
+            mask = cv2.resize(mask, (1280, 720), interpolation=cv2.INTER_NEAREST)
             cpts4, cpts2,  cpts = sample['keypoints4'],  sample['keypoints2'],  sample['keypoints']
             frames_sequence = torch.stack([torch.from_numpy(image4), torch.from_numpy(image2),  torch.from_numpy(image)], dim=0)
             mask_sequence = torch.stack([torch.from_numpy(mask4), torch.from_numpy(mask2), torch.from_numpy(mask)], dim=0)

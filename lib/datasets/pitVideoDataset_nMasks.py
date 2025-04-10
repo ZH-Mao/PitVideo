@@ -48,8 +48,6 @@ class PitDataset(Dataset):
         self.transform_train = album.Compose([
             album.ShiftScaleRotate(
                 shift_limit=(-0.2, 0.2),
-                # scale_limit=(-0.1, 0.2),
-                # rotate_limit=(-np.pi/6, np.pi/6),
                 scale_limit=(-0.2, 0.3),
                 rotate_limit=(-30, 30),
                 always_apply=False,
