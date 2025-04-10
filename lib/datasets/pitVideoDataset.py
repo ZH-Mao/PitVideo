@@ -2,200 +2,176 @@ from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 import os
-# from PIL import Image
 import albumentations as album
 import torch
-# import matplotlib as plt
 import cv2
 from PIL import Image
-from .bdl_dataloader import dist_map_transform
-
-# Create a PitDataset class
-
 
 class PitDataset(Dataset):
-    # Initialize the class
-    def __init__(self, cfg=None, is_train=True) -> None:
+    def __init__(self, cfg=None, is_train=True, to_tensor=False) -> None:
         super().__init__()
-        # specify annotation file for dataset
+        # Select the annotation csv file based on the training mode
         if is_train:
             self.csv_file = cfg.DATASET.TRAIN_SET
-            # self.csv_file ='image_centroid_fold1_train.csv'
         else:
             self.csv_file = cfg.DATASET.TEST_SET
-            # self.csv_file = 'image_centroid_fold1_val.csv'
-        # video clips 
         self.csv_file2 = cfg.DATASET.CLIPS
         self.is_train = is_train
-        # self.transform = transform
-        # self.preprocessing = preprocessing
         self.data_root = cfg.DATASET.ROOT
         self.csv_file_root = cfg.DATASET.CSV_FILE_ROOT
         self.image_root = cfg.DATASET.IMAGE_ROOT
         self.mask_root = cfg.DATASET.MASK_ROOT
+        self.to_tensor = to_tensor
 
-        # load annotations
-        self.landmarks_frame = pd.read_csv(os.path.join(
+        # Load annotations and video clip information
+        self.landmarks_frame = pd.read_excel(os.path.join(
             self.data_root, self.csv_file_root, self.csv_file))
-        self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        
-        # load vide clips' images
-        self.video_frames = pd.read_csv(os.path.join(
+        self.video_frames = pd.read_excel(os.path.join(
             self.data_root, self.csv_file_root, self.csv_file2))
 
+        self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+        # Set the relative positions for processing frames (default is 3 frames: [-4, -2, 0])
+        self.frame_offsets = cfg.DATASET.FRAME_OFFSETS if hasattr(cfg.DATASET, 'FRAME_OFFSETS') else [-4, -2, 0]
+
+        # Construct additional_targets for albumentations:
+        # The main frame uses the default keys, while other frames are named based on the absolute value (e.g., -4 -> "image4", "mask4", "keypoints4")
+        additional_targets = {}
+        for offset in self.frame_offsets:
+            if offset != 0:
+                key_im = f"image{abs(offset)}"
+                key_mask = f"mask{abs(offset)}"
+                key_kpt = f"keypoints{abs(offset)}"
+                additional_targets[key_im] = "image"
+                additional_targets[key_mask] = "mask"
+                additional_targets[key_kpt] = "keypoints"
+
+        # Define augmentation transforms for training and validation
         self.transform_train = album.Compose([
             album.ShiftScaleRotate(
                 shift_limit=(-0.2, 0.2),
-                # scale_limit=(-0.1, 0.2),
-                # rotate_limit=(-np.pi/6, np.pi/6),
                 scale_limit=(-0.2, 0.3),
                 rotate_limit=(-30, 30),
                 always_apply=False,
                 p=0.5),
-            # album.Resize(height=736, width=1280),
-            album.Resize(height=720, width=1296),
+            album.Resize(height=736, width=1280),
             album.ColorJitter(brightness=0.4, contrast=0.3,
                               saturation=0.3, hue=0.1, always_apply=False, p=0.5),
         ], keypoint_params=album.KeypointParams(format='xy', remove_invisible=False),
-                                             additional_targets={
-                                            #    'image4': 'image', 
-                                            #    'image3': 'image', 
-                                               'image2': 'image',
-                                               'image1': 'image',
-                                               'image': 'image'})
+           additional_targets=additional_targets)
 
         self.transform_val = album.Compose([
-            # album.Resize(height=736, width=1280),
-            album.Resize(height=720, width=1296),
-        ], keypoint_params=album.KeypointParams(format='xy', remove_invisible=False), 
-                                           additional_targets={
-                                            #    'image4': 'image', 
-                                            #    'image3': 'image', 
-                                               'image2': 'image',
-                                               'image1': 'image',
-                                               'image': 'image'})
-        
-        
-        # # to use boundary loss - BDL library
-        self.disttransform = dist_map_transform([1, 1], 3)
+            album.Resize(height=736, width=1280),
+        ], keypoint_params=album.KeypointParams(format='xy', remove_invisible=False),
+           additional_targets=additional_targets)
 
-    # Return the length of the dataset
     def __len__(self) -> int:
         return len(self.landmarks_frame)
 
-    # Return the item at the given index
     def __getitem__(self, idx: int) -> tuple:
-        # image_path = os.path.join(self.image_root,
-        #                           self.landmarks_frame.iloc[idx, 1])
-        mask_path = os.path.join(self.mask_root,
-                                 self.landmarks_frame.iloc[idx, 1].split('.')[0]+'.png')
-        name = self.landmarks_frame.iloc[idx, 1].split('.')[0]
-
-        # centroid points coordinates (cpts)
-        cpts = self.landmarks_frame.iloc[idx, 2:].values
-        cpts = cpts.astype('float').reshape(-1, 2)
-        cpts_presence = np.float32(cpts != -100)
-        cpts = cpts*cpts_presence
-        cpts[:, 0] = cpts[:, 0]*1280
-        cpts[:, 1] = cpts[:, 1]*720
-      
-        # mask_path = os.path.join(self.mask_root,
-        #                          self.landmarks_frame.iloc[idx, 1].split('.')[0]+'.png')
-        # name = self.landmarks_frame.iloc[idx, 1].split('.')[0]
-        
-        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        
-        labeled_frame_name = self.landmarks_frame.iloc[idx, 1]        
-        # find index of labeled_frame_name in video sequence
+        # Obtain the labeled frame name; typically the annotation frame name is in the second column of landmarks_frame
+        labeled_frame_name = self.landmarks_frame.iloc[idx, 1]
+        # Find the corresponding frame in the video clip
         matching_rows = self.video_frames.loc[self.video_frames['image'] == labeled_frame_name]
         frameID_in_video = matching_rows.index.tolist()
-        
+        if len(frameID_in_video) == 0:
+            raise IndexError(f"Could not find a matching frame in the video frames for: {labeled_frame_name}")
 
-        # image4 = cv2.imread(os.path.join(self.image_root,
-        #                         self.video_frames.iloc[frameID_in_video[0]-4, 0]))
-        # image4 = cv2.cvtColor(image4, cv2.COLOR_BGR2RGB)
-        
-        # image3 = cv2.imread(os.path.join(self.image_root,
-        #                         self.video_frames.iloc[frameID_in_video[0]-3, 0]))
-        # image3 = cv2.cvtColor(image3, cv2.COLOR_BGR2RGB)
-        
-        image2 = cv2.imread(os.path.join(self.image_root,
-                                self.video_frames.iloc[frameID_in_video[0]-2, 0]))
-        image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
-        
-        image1 = cv2.imread(os.path.join(self.image_root,
-                                self.video_frames.iloc[frameID_in_video[0]-1, 0]))
-        image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
-        
-        image = cv2.imread(os.path.join(self.image_root,
-                                self.video_frames.iloc[frameID_in_video[0], 0]))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
-        # since we don't have masks and landmarks for video frames, we use the same masks and landmarks from labeled frame.
-        # this is because we only stack images; masks and landmarks are not stacked.
+        # Build a dictionary for albumentations containing images, masks, and keypoints for all frames
+        transform_args = {}
+        # Save the original keypoint presence information (augmentation does not process this automatically)
+        kpt_presence_dict = {}
+        # Save the filenames of all frames
+        frame_name_list = []
+
+        for offset in self.frame_offsets:
+            ref_index = frameID_in_video[0] + offset
+            # Boundary check
+            if ref_index < 0 or ref_index >= len(self.video_frames):
+                raise IndexError(f"Calculated frame index {ref_index} is out of range for video frames.")
+            row = self.video_frames.iloc[ref_index]
+            # Generate different keys based on the offset: the labeled frame (offset==0) uses the default keys
+            if offset == 0:
+                img_key = "image"
+                mask_key = "mask"
+                kpt_key = "keypoints"
+            else:
+                img_key = f"image{abs(offset)}"
+                mask_key = f"mask{abs(offset)}"
+                kpt_key = f"keypoints{abs(offset)}"
+
+            # Read the image and convert it to RGB
+            img_path = os.path.join(self.image_root, row[1])
+            img = cv2.imread(img_path)
+            if img is None:
+                raise FileNotFoundError(f"Image file not found: {img_path}")
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            transform_args[img_key] = img
+
+            # Read the mask and normalize it by dividing by 120
+            mask_path = os.path.join(self.mask_root, row[1])
+            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            if mask is None:
+                raise FileNotFoundError(f"Mask file not found: {mask_path}")
+            mask = mask / 120.0
+            transform_args[mask_key] = mask
+
+            # Read keypoints; assume the keypoint data occupies columns 3 to 10 (i.e., indices 2 to 9)
+            kp = row[2:10].values.astype('float').reshape(-1, 2)
+            presence = (kp != -100).astype(np.float32)
+            kp = kp * presence
+            # Convert the normalized keypoint values to absolute pixel coordinates (assuming image width 1280 and height 720 or 736, as per the original code)
+            kp[:, 0] = kp[:, 0] * 1280
+            kp[:, 1] = kp[:, 1] * 720
+            transform_args[kpt_key] = kp
+            kpt_presence_dict[kpt_key] = presence
+
+            frame_name_list.append(row[1])
+
+        # Apply the augmentation transforms simultaneously to all frames
         if self.is_train:
-            # sample = self.transform_train(
-            #     image4=image4, image3=image3, image2=image2, image1=image1,image=image,  mask=mask, keypoints=cpts)
-            # image4, image3, image2, image1, image, mask, cpts = sample['image4'],sample['image3'],sample['image2'],sample['image1'],sample['image'], sample['mask'], sample["keypoints"]
-            # frames_sequence = torch.stack([torch.from_numpy(image4), torch.from_numpy(image3), torch.from_numpy(image2), torch.from_numpy(image1), torch.from_numpy(image)], dim=0)
-            sample = self.transform_train(
-                image2=image2, image1=image1,image=image,  mask=mask, keypoints=cpts)
-            image2, image1, image, mask, cpts = sample['image2'],sample['image1'],sample['image'], sample['mask'], sample["keypoints"]
-            frames_sequence = torch.stack([torch.from_numpy(image2), torch.from_numpy(image1), torch.from_numpy(image)], dim=0)
-            
-            # frames_sequence = frames_sequence.astype(np.float32)
-            frames_sequence = (frames_sequence/255.0 - self.mean) / self.std
-            frames_sequence = frames_sequence.permute(0, 3, 1, 2)
+            sample = self.transform_train(**transform_args)
+            # Resize masks to ensure they match the dimensions (1280, 720); note that cv2.resize expects size in (width, height)
+            for offset in self.frame_offsets:
+                mask_key = "mask" if offset == 0 else f"mask{abs(offset)}"
+                sample[mask_key] = cv2.resize(sample[mask_key], (1280, 720), interpolation=cv2.INTER_NEAREST)
         else:
-            # sample = self.transform_val(image4=image4, image3=image3, image2=image2, image1=image1,image=image,  mask=mask, keypoints=cpts)
-            # image4, image3, image2, image1, image, mask, cpts = sample['image4'],sample['image3'],sample['image2'],sample['image1'],sample['image'], sample['mask'], sample["keypoints"]
-            # frames_sequence = torch.stack([torch.from_numpy(image4), torch.from_numpy(image3), torch.from_numpy(image2), torch.from_numpy(image1), torch.from_numpy(image)], dim=0)
-            sample = self.transform_val(
-                image2=image2, image1=image1,image=image,  mask=mask, keypoints=cpts)
-            image2, image1, image, mask, cpts = sample['image2'],sample['image1'],sample['image'], sample['mask'], sample["keypoints"]
-            frames_sequence = torch.stack([torch.from_numpy(image2), torch.from_numpy(image1), torch.from_numpy(image)], dim=0)
-            # frames_sequence = frames_sequence.astype(np.float32)
-            frames_sequence = (frames_sequence/255.0 - self.mean) / self.std
+            sample = self.transform_val(**transform_args)
+
+        # Construct sequences of images, masks, and keypoints following the order in frame_offsets
+        frames_list = []
+        mask_list = []
+        cpts_list = []
+        cpts_presence_list = []
+        for offset in self.frame_offsets:
+            if offset == 0:
+                img_key = "image"
+                mask_key = "mask"
+                kpt_key = "keypoints"
+            else:
+                img_key = f"image{abs(offset)}"
+                mask_key = f"mask{abs(offset)}"
+                kpt_key = f"keypoints{abs(offset)}"
+            frames_list.append(torch.from_numpy(sample[img_key]))
+            mask_list.append(torch.from_numpy(sample[mask_key]))
+            cpts_list.append(torch.from_numpy(np.array(sample[kpt_key])))
+            cpts_presence_list.append(torch.from_numpy(kpt_presence_dict[kpt_key]))
+
+        frames_sequence = torch.stack(frames_list, dim=0)
+        mask_sequence = torch.stack(mask_list, dim=0)
+        cpts_sequence = torch.stack(cpts_list, dim=0)
+        cpts_presence_sequence = torch.stack(cpts_presence_list, dim=0)
+
+        # If specified, convert to tensor, normalize the images, and permute the dimensions to [frames, channels, height, width]
+        if self.to_tensor:
+            frames_sequence = (frames_sequence.float() / 255.0 - torch.tensor(self.mean).float()) / torch.tensor(self.std).float()
             frames_sequence = frames_sequence.permute(0, 3, 1, 2)
 
-        # Normalize image
-        cpts = cpts*cpts_presence
-        # cpts[:, 0] = cpts[:, 0]/1280
-        # cpts[:, 1] = cpts[:, 1]/736
-        cpts[:, 0] = cpts[:, 0]/1296
-        cpts[:, 1] = cpts[:, 1]/720
+        # Normalize the keypoint coordinates by dividing by the dimensions after applying the keypoint presence mask
+        dims = torch.tensor([1280, 736]).float()
+        cpts_sequence = cpts_sequence * cpts_presence_sequence / dims
+        mask_invalid = (cpts_sequence[:, :, 0] < 0) | (cpts_sequence[:, :, 0] > 1) | (cpts_sequence[:, :, 1] < 0) | (cpts_sequence[:, :, 1] > 1)
+        cpts_sequence[mask_invalid] = 0.
 
-        # find points that excess the range of image after aug and replace them with [-100, -100]
-        condition_first_column = (cpts[:, 0] > 1) | (cpts[:, 0] < 0)
-        condition_second_column = (cpts[:, 1] > 1) | (cpts[:, 1] < 0)
-        rows_to_change = np.where(
-            condition_first_column | condition_second_column)
-        cpts[rows_to_change] = 0.
-
-        # Replace coordinates that are original absent with [-100,-100]
-        cpts_absence = np.float32(cpts_presence == 0)
-        cpts = cpts-0.*cpts_absence
-        cpts_presence = np.float32(cpts != 0.)
-        # image = image.astype(np.float32)
-        # image = (image/255.0 - self.mean) / self.std
-        # image = image.transpose([2, 0, 1])
-        # image = torch.Tensor(image)
-        mask = torch.Tensor(mask)
-        cpts = torch.Tensor(cpts)
-        cpts_presence = torch.Tensor(cpts_presence)
-        
-        # to use boundary loss - BDL library
-        dist_map_tensor=self.disttransform(mask)
-
-        return frames_sequence, mask, cpts, cpts_presence, name, dist_map_tensor
-        # return image, mask, cpts, cpts_presence, name
-
-
-
-if __name__ == '__main__':
-    dataset = PitDataset(is_train=True)
-    print(dataset[0][0].shape)
-    print(dataset[0][1].shape)
-    print(dataset[0][2].shape)
-    print(dataset[0][3].shape)
+        return frames_sequence, mask_sequence, cpts_sequence, cpts_presence_sequence, frame_name_list
