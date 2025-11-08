@@ -25,10 +25,10 @@ class TLCA(nn.Module):
         # att = 1 - (dist / 0.5)
         att = rearrange(att, 'b l c h w -> (b l) c h w')
 
-        # 计算注意力权重的平均值
+        # calculate the average of attention weights
         att_avg = torch.mean(att, dim=1, keepdim=True)
 
-        # 将注意力权重扩展到与 x 相同的通道数
+        # expand the attention weights to the same number of channels as x
         att_expanded = att_avg.expand(-1, x.shape[1], -1, -1)
 
         att_x = x * att_expanded

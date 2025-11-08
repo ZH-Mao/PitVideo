@@ -51,42 +51,29 @@ def get_mask_from_frames(annotation_list, idx, mask_root):
     mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)      
     return mask, fold
 
-# def traking_points_to_mask(visible_points_i, mask_w, mask_h):
-#     hull = concave_hull(MultiPoint(visible_points_i), ratio=0.4)
-#     # 创建mask图片
-#     img_size = (mask_w, mask_h)
-#     mask_img = Image.new('L', img_size, 0)
-#     draw = ImageDraw.Draw(mask_img)
-#     hull_points = list(zip(*hull.exterior.coords.xy))
-#     if len(hull_points) > 2:
-#         draw.polygon(hull_points, fill=255)
-    
-#     # For debug
-#     # mask_img.save('mask.png')
-#     return np.array(mask_img)
 
 def traking_points_to_mask(visible_points_i, mask_w, mask_h, eps=30, min_samples=10):
     
-    # 创建空白mask图片
+    # create blank mask image
     img_size = (mask_w, mask_h)
     mask_img = Image.new('L', img_size, 0)
     draw = ImageDraw.Draw(mask_img)
     if len(visible_points_i) > 2:
-        # 使用DBSCAN自动分组，eps和min_samples根据数据集调整
+        # use DBSCAN to automatically group the points, eps and min_samples are adjusted according to the dataset
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(visible_points_i)
         labels = db.labels_
 
-        # 对每个组(排除噪声数据)生成mask
+        # generate mask for each group (excluding noise data)
         for label in set(labels):
             if label == -1:
-                # -1表示噪声点，跳过
+                # -1 represents noise points, skip
                 continue
             points_in_cluster = visible_points_i[labels == label]
 
-            # 生成凸包或凹包
+            # generate convex or concave hull
             hull = concave_hull(MultiPoint(points_in_cluster), ratio=0.4)
             
-            # 绘制多边形
+            # draw polygon
             hull_points = list(zip(*hull.exterior.coords.xy))
             if len(hull_points) > 2:
                 draw.polygon(hull_points, fill=255)
@@ -102,7 +89,7 @@ if __name__ == '__main__':
     annotation_list_path = 'Landmarks_2_structure_4.csv'
     video_index_path = 'videoIndex_5fps.csv'
     output_path = 'Masks_pseudo4/'
-    output_csv = "Landmarks_pseudo_structure_4_2.csv"  # 替换为你要保存的CSV文件的路径
+    output_csv = "Landmarks_pseudo_structure_4_2.csv"  # replace with the path to save the CSV file
     
     video_length = 5
     class_values = [1,2]
@@ -112,9 +99,9 @@ if __name__ == '__main__':
     annotation_list = pd.read_csv(os.path.join(root, annotation_list_path))
     video_frames = pd.read_csv(os.path.join(root, video_index_path))
     
-    header_df = pd.read_csv(os.path.join(root, annotation_list_path), nrows=0)  # 读取表头
+    header_df = pd.read_csv(os.path.join(root, annotation_list_path), nrows=0)  # read header
     header = header_df.columns.tolist()
-    # 准备数据
+    # prepare data
     data = []
     
     model = CoTrackerPredictor(
@@ -166,7 +153,7 @@ if __name__ == '__main__':
                     mask1.append(mask_img)
             else:
                 for i in range(video_length-1):
-                    # 创建mask图片
+                    # create mask image
                     img_size = (width, height)
                     mask_img = Image.new('L', img_size, 0)
                     mask1.append(mask_img)
@@ -175,19 +162,19 @@ if __name__ == '__main__':
         
         final_masks = []
         for i in range(video_length):
-            # 创建mask图片
+            # create mask image
             img_size = (width, height)
             final_mask = Image.new('L', img_size, 0)
             final_mask = np.array(final_mask)
             for j in range(len(mask2)):
                 final_mask[mask2[j][i]==255]=class_values[j]            
-            # 将最终的mask添加到列表中
+            # add the final mask to the list
             final_masks.append(final_mask)
             
-        # 保存最终的mask为图片
+        # save the final mask as an image
         for frame_name, mask in zip(frames_name, final_masks):
-            mask_image = Image.fromarray((mask * 127).astype(np.uint8))  # 标准化到0-255范围内，方便观看
-            # frame_name = frame_name.replace('.png', '_mask.png')  # 假设原图是.png格式，根据实际情况修改
+            mask_image = Image.fromarray((mask * 127).astype(np.uint8))  # normalize to the range of 0-255, for easy viewing
+            # frame_name = frame_name.replace('.png', '_mask.png')  # assume the original image is .png format, modify according to the实际情况
             mask_image.save(os.path.join(root, output_path,frame_name))
 
         ####################################################################################################
@@ -223,7 +210,7 @@ if __name__ == '__main__':
             # frame id of the reference in the video clip, a clip consisting 5 frames, frame_id=4,
             frame_id = np.ones(len(queries))*(video_length-1)
             queries = np.insert(queries, 0, frame_id, axis=1)
-            queries = torch.from_numpy(queries).float() # 要加上.float(), 因为numpy生成小数默认为double, 但是模型期望FloatTensor
+            queries = torch.from_numpy(queries).float() # add .float(), because numpy generates small numbers as double by default, but the model expects FloatTensor
             queries = queries.to(device)
             pred_tracks, pred_visibility = model(video, queries=queries[None], backward_tracking=True)
             # visulization
@@ -243,13 +230,13 @@ if __name__ == '__main__':
             cpts_tracked = []
             for i in range(video_length-1):
                 cpts_tracked_i = np.ones((len(cpts_presence_ref), 2))*(-100)
-                pred_tracks_i = pred_tracks[:,i, :, :].squeeze(0) # squeeze()要指定维度，不然只有一个坐标的话会出Bug
+                pred_tracks_i = pred_tracks[:,i, :, :].squeeze(0) # squeeze() specify the dimension, otherwise there will be a Bug if there is only one coordinate
                 visible_points_indices_i = np.where(pred_visibility[:,i,:].squeeze())[0]
                 if not visible_points_indices_i.size ==0:
                     cpts_tracked_indices = presence_indices[visible_points_indices_i]
                     cpts_tracked_i[cpts_tracked_indices] = pred_tracks_i[visible_points_indices_i]/[1280, 720]
                     
-                    # # 相邻帧追踪的点距离应该不会相距太远，设置一个threshold来排除错误追踪的点（实际测试发现不需要，没有这样的点出现） 
+                    # # the distance between adjacent frames should not be too far, set a threshold to exclude error tracking points (actually tested, no such points appear) 
                     # distance=np.sqrt(np.sum((pred_tracks_i[visible_points_indices_i] - cpts_ref[cpts_tracked_indices])**2, axis=1))
                     # thresh = np.where(distance < 50)[0]
                     # if not thresh.size ==0:
@@ -265,10 +252,10 @@ if __name__ == '__main__':
         for i, frame_name in enumerate(frames_name):
             row = [fold, frame_name]
             for coord in cpts_tracked[i]:
-                row.extend(coord)  # 添加坐标点
+                row.extend(coord)  # add coordinate points
             data.append(row)
 
-    # 创建DataFrame
+    # create DataFrame
     df = pd.DataFrame(data, columns=header)
-    # 保存到CSV
+    # save to CSV
     df.to_csv(os.path.join(root, output_csv), index=False)
