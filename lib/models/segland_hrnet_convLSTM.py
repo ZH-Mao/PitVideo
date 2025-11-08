@@ -252,55 +252,6 @@ blocks_dict = {
     'BOTTLENECK': Bottleneck
 }
 
-# # zhehua========================================start
-
-
-# class HRNetPoolOutput(nn.Module):
-#     '''校验完成:完成输出的通道变换, 并经过自适应均值池化得到1x1的图像
-
-#         params:
-#             inchannels:  输出层的输入通道
-#             outchannels: 输出层的变换后的输出通道
-#     '''
-
-#     def __init__(self, inchannels, outchannels):
-#         super(HRNetPoolOutput, self).__init__()
-
-#         self.conv = nn.Conv2d(inchannels, outchannels,
-#                               kernel_size=1, bias=False)
-#         self.avgpool = nn.AdaptiveAvgPool2d(
-#             output_size=1)   # 自适应池化，得到指定大小的池化结果
-#         self.relu = nn.ReLU()
-
-#     def forward(self, inputs):
-
-#         out = self.conv(inputs)
-#         out = self.avgpool(out)
-#         out = self.relu(out)
-#         return out
-
-
-# class HRNetRegression(nn.Module):
-#     '''校验完成：产生预测分类的结果，支持多分辨率预测输出
-
-#         params:
-#             inchannels:  输入大小
-#             num_classes: 分类数 > 0
-#     '''
-
-#     def __init__(self, inchannels, num_classes):
-#         super(HRNetRegression, self).__init__()
-
-#         self.flatten = nn.Flatten()
-#         self.out_fc = nn.Linear(inchannels, num_classes)
-
-#     def forward(self, inputs):
-
-#         out = self.flatten(inputs)
-#         out = self.out_fc(out)
-
-#         return out
-# # zhehua========================================end
 
 
 class HighResolutionNet(nn.Module):
@@ -376,19 +327,11 @@ class HighResolutionNet(nn.Module):
                 padding=1 if extra.FINAL_CONV_KERNEL == 3 else 0)
         )
 
-        # self.landhead = nn.Sequential(
-        #     nn.Conv2d(in_channels=last_inp_channels, out_channels=2048,
-        #                       kernel_size=1, bias=False),
-        #     nn.AdaptiveAvgPool2d(output_size=1),  # 自适应池化，得到指定大小的池化结果
-        #     nn.ReLU(),
-        #     nn.Flatten(),
-        #     nn.Linear(2048, 8)
-        # )
         
         self.landhead = nn.Sequential(
             nn.Conv2d(in_channels=last_inp_channels, out_channels=2048,
                               kernel_size=1, bias=False),
-            nn.AdaptiveAvgPool2d(output_size=1),  # 自适应池化，得到指定大小的池化结果
+            nn.AdaptiveAvgPool2d(output_size=1),  # adaptive pooling, get the pooling result of the specified size
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(2048, 8)

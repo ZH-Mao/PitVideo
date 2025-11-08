@@ -491,7 +491,7 @@ class HRNET_SSTAN(nn.Module):
         self.landhead = nn.Sequential(
             nn.Conv2d(in_channels=176, out_channels=1024,
                             kernel_size=1, bias=False),
-            nn.AdaptiveAvgPool2d(output_size=1),  # 自适应池化，得到指定大小的池化结果
+            nn.AdaptiveAvgPool2d(output_size=1),  # adaptive pooling, get the pooling result of the specified size
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(1024, 8)

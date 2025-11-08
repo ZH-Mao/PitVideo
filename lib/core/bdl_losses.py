@@ -15,9 +15,9 @@ from .bdl_utils import one_hot2hd_dist
 #     return one_hot
 
 def to_one_hot(tensor, nClasses):
-    n, _, h, w = tensor.size()  # 使用 _ 忽略单一通道维度
+    n, _, h, w = tensor.size()  # use _ to ignore the single channel dimension
     one_hot = torch.zeros(n, nClasses, h, w).to(tensor.device)
-    tensor = tensor.long()  # 确保tensor是int64类型
+    tensor = tensor.long()  # ensure the tensor is int64 type
     one_hot.scatter_(1, tensor, 1)
     return one_hot
 

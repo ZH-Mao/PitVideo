@@ -257,15 +257,13 @@ blocks_dict = {
     'BOTTLENECK': Bottleneck
 }
 
-# zhehua========================================start
-
 
 class HRNetPoolOutput(nn.Module):
-    '''校验完成:完成输出的通道变换, 并经过自适应均值池化得到1x1的图像
+    '''completed: completed the channel transformation of the output, and the adaptive mean pooling to get 1x1 image
 
         params:
-            inchannels:  输出层的输入通道
-            outchannels: 输出层的变换后的输出通道
+            inchannels:  input channels of the output layer
+            outchannels: output channels of the output layer after transformation
     '''
 
     def __init__(self, inchannels, outchannels):
@@ -274,7 +272,7 @@ class HRNetPoolOutput(nn.Module):
         self.conv = nn.Conv2d(inchannels, outchannels,
                               kernel_size=1, bias=False)
         self.avgpool = nn.AdaptiveAvgPool2d(
-            output_size=1)   # 自适应池化，得到指定大小的池化结果
+            output_size=1)   # adaptive pooling, get the pooling result of the specified size
         self.relu = nn.ReLU()
 
     def forward(self, inputs):
@@ -286,11 +284,11 @@ class HRNetPoolOutput(nn.Module):
 
 
 class HRNetRegression(nn.Module):
-    '''校验完成：产生预测分类的结果，支持多分辨率预测输出
+    '''completed: generate the predicted classification result, support multi-resolution prediction output
 
         params:
-            inchannels:  输入大小
-            num_classes: 分类数 > 0
+            inchannels:  input size
+            num_classes: number of classes > 0
     '''
 
     def __init__(self, inchannels, num_classes):
@@ -305,7 +303,6 @@ class HRNetRegression(nn.Module):
         out = self.out_fc(out)
 
         return out
-# zhehua========================================end
 
 
 class HighResolutionNet(nn.Module):
